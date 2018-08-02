@@ -23,6 +23,9 @@ Este projeto é uma ferramenta de automação para fechar as issues antigas do r
  
  - Rode no terminal `close-issues-jobs`
 
+## Colabore
+
+Crie issues com sugestões ou PRs com testes e/ou implementações.
 
 ## Licença
 
