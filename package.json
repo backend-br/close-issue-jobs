@@ -1,6 +1,6 @@
 {
   "name": "close-issues-jobs",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Fecha issues abertas a mais que três meses sem atualização",
   "main": "bin/index.js",
   "scripts": {
