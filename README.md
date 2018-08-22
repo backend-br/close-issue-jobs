@@ -8,20 +8,10 @@ Este projeto é uma ferramenta de automação para fechar as issues antigas do r
 
 ### Instalando
 
- - Rode no terminal `npm i g close-issues-jobs`
- - Configure os acessos em `$HOME/.config/configstore`
- 
- ```
-{
-        "username": [string],
-        "password": [string],
-        "repository": [string],
-        "time": [int],
-        "period": [string|months,month,years,year,days,day]
-}
-```
- 
- - Rode no terminal `close-issues-jobs`
+- Rode no terminal `npm i g close-issues-jobs`
+- Execute `close-issues-jobs`
+- Coloque suas credenciais como pedido
+- Se precisar redefinir, use `close-issues-jobs reset`
 
 ## Colabore
 
@@ -39,3 +29,4 @@ Crie issues com sugestões ou PRs com testes e/ou implementações.
 - [Colabore](https://github.com/backend-br/colabore)
 - [Poste mais!](https://github.com/backend-br/poste-mais)
 - [Awesome Back-End](https://github.com/backend-br/awesome-backend)
+
