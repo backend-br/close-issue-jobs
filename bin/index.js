@@ -3,36 +3,74 @@
 const GitHub = require('github-api')
 const moment = require('moment')
 const Configstore = require('configstore')
-const pkg = require('../package.json');
-const config = new Configstore(pkg.name);
+const pkg = require('../package.json')
+const config = new Configstore(pkg.name)
+const inquirer = require('inquirer')
+const argv = require('minimist')(process.argv.slice(2))
 
-const github = new GitHub({
-    username: config.get('username'),
-    password: config.get('password')
-});
-
-const issues = github.getIssues(config.get('repository'))
-
-if (config.get('time') == "" || config.get('time') == undefined) {
-    throw "Time [int] is not defined on config"
+if (argv._[0] && argv._[0] === 'reset') {
+  config.all = {}
 }
 
-if (config.get('period') == "" || config.get('period') == undefined) {
-    throw "Period [months, years, days, month, year or day] is not defined on config file"
-}
+const main = async () => {
+  if (
+    !config.has('time') ||
+    !config.has('token') ||
+    !config.has('repository') ||
+    !config.has('period')
+  ) {
+    const validate = (input) => input !== ''
+    const questions = [
+      {
+        name: 'token',
+        message: 'Put your token here'
+      },
+      {
+        name: 'repository',
+        message: 'What repository we should watch? <user/repo>'
+      },
+      {
+        name: 'time',
+        message: 'What the amount of time?'
+      },
+      {
+        name: 'period',
+        message: 'What the unit of time? Valid values are: months, days, years',
+        choices: ['years', 'months', 'days', 'year', 'month', 'day']
+      }
+    ]
 
-issues.listIssues().then(response => {
-    for (let i in response.data) {
-        let last_updated = response.data[i].updated_at
+    const answers = await inquirer.prompt(questions.map(q => Object.assign(q, { validate })))
+    Object.keys(answers).forEach(k => {
+      config.set(k, answers[k])
+    })
+  }
 
-        let time_passed = moment(last_updated).fromNow(true).split(' ')
+  const github = new GitHub({
+    token: config.get('token')
+  })
 
-        if (time_passed[0] > config.get('time') && time_passed[1] == config.get('period')) {
-            issues.createIssueComment(response.data[i].number, 'Issue fechada pelo bot. Motivo: Sem interações em um periodo de 3 meses.')
+  const issues = github.getIssues(config.get('repository'))
+  const list = await issues.listIssues()
+  const toUpdate = []
 
-            issues.editIssue(response.data[i].number, {'state': 'closed'})
-        }
+  list.data.forEach(i => {
+    let lastUpdated = list.data[i].updated_at
+    let timePassed = moment(lastUpdated).fromNow(true).split(' ')
+
+    if (timePassed[0] > config.get('time') && timePassed[1] === config.get('period')) {
+      toUpdate.push(issues.createIssueComment(list.data[i].number, 'Issue fechada pelo bot. Motivo: Sem interações em um periodo de 3 meses.'))
+      toUpdate.push(issues.editIssue(list.data[i].number, {'state': 'closed'}))
     }
-}).catch(error => {
-    throw "Error verify data login"
-})
+  })
+
+  if (toUpdate.length > 0) {
+    await Promise.all(toUpdate)
+  }
+
+  console.log(`${toUpdate.length / 2} issues were closed!`)
+}
+
+main()
+  .then()
+  .catch(console.error)
