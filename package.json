@@ -12,6 +12,7 @@
     "axios": "^0.18.0",
     "configstore": "^4.0.0",
     "github-api": "^3.0.0",
+    "inquirer": "^6.1.0",
     "jest": "^23.4.2",
     "moment": "^2.22.2"
   }
