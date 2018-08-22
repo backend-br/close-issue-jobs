@@ -6,20 +6,20 @@ const Configstore = require('configstore')
 const pkg = require('../package.json')
 const config = new Configstore(pkg.name)
 const inquirer = require('inquirer')
-const argv = require('minimist')(process.argv.slice(2));
+const argv = require('minimist')(process.argv.slice(2))
 
-if (argv._[0] && argv._[0] == 'reset') {
-  config.all = {};
+if (argv._[0] && argv._[0] === 'reset') {
+  config.all = {}
 }
 
 const main = async () => {
   if (
-    !config.has('time') || 
+    !config.has('time') ||
     !config.has('token') ||
     !config.has('repository') ||
     !config.has('period')
   ) {
-    const validate = (input) => input !== ""
+    const validate = (input) => input !== ''
     const questions = [
       {
         name: 'token',
@@ -37,38 +37,38 @@ const main = async () => {
         name: 'period',
         message: 'What the unit of time? Valid values are: months, days, years',
         choices: ['years', 'months', 'days', 'year', 'month', 'day']
-      },
+      }
     ]
 
     const answers = await inquirer.prompt(questions.map(q => Object.assign(q, { validate })))
     Object.keys(answers).forEach(k => {
       config.set(k, answers[k])
-    });
+    })
   }
 
   const github = new GitHub({
-      token: config.get('token')
-  });
+    token: config.get('token')
+  })
 
   const issues = github.getIssues(config.get('repository'))
   const list = await issues.listIssues()
   const toUpdate = []
 
   list.data.forEach(i => {
-      let last_updated = response.data[i].updated_at
-      let time_passed = moment(last_updated).fromNow(true).split(' ')
+    let lastUpdated = list.data[i].updated_at
+    let timePassed = moment(lastUpdated).fromNow(true).split(' ')
 
-      if (time_passed[0] > config.get('time') && time_passed[1] == config.get('period')) {
-          toUpdate.push(issues.createIssueComment(response.data[i].number, 'Issue fechada pelo bot. Motivo: Sem interações em um periodo de 3 meses.'))
-          toUpdate.push(issues.editIssue(response.data[i].number, {'state': 'closed'}))
-      }
+    if (timePassed[0] > config.get('time') && timePassed[1] === config.get('period')) {
+      toUpdate.push(issues.createIssueComment(list.data[i].number, 'Issue fechada pelo bot. Motivo: Sem interações em um periodo de 3 meses.'))
+      toUpdate.push(issues.editIssue(list.data[i].number, {'state': 'closed'}))
+    }
   })
 
   if (toUpdate.length > 0) {
     await Promise.all(toUpdate)
   }
 
-  console.log(`${toUpdate.length / 2} issues were closed!`);
+  console.log(`${toUpdate.length / 2} issues were closed!`)
 }
 
 main()
