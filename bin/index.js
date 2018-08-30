@@ -53,8 +53,12 @@ const main = async () => {
   const issues = github.getIssues(config.get('repository'))
   const list = await issues.listIssues()
   const toUpdate = []
+  
+  for (i in list.data) {
+    if (list.data[i] == undefined) {
+      return
+    }
 
-  list.data.forEach(i => {
     let lastUpdated = list.data[i].updated_at
     let timePassed = moment(lastUpdated).fromNow(true).split(' ')
 
@@ -62,7 +66,7 @@ const main = async () => {
       toUpdate.push(issues.createIssueComment(list.data[i].number, 'Issue fechada pelo bot. Motivo: Sem interações em um periodo de 3 meses.'))
       toUpdate.push(issues.editIssue(list.data[i].number, {'state': 'closed'}))
     }
-  })
+  }
 
   if (toUpdate.length > 0) {
     await Promise.all(toUpdate)
