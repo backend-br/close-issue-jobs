@@ -2,49 +2,23 @@
 
 const GitHub = require('github-api')
 const moment = require('moment')
-const Configstore = require('configstore')
 const pkg = require('../package.json')
-const config = new Configstore(pkg.name)
+const getConfig = require('./config')
 const inquirer = require('inquirer')
-const argv = require('minimist')(process.argv.slice(2))
+const Issue = require('./Issue')
+const mongoose = require('mongoose')
+mongoose.Promise = global.Promise;
+const mongooseOptions = {
+  useMongoClient: true,
+  keepAlive: 300000,
+  connectTimeoutMS: 60000
+};
 
-if (argv._[0] && argv._[0] === 'reset') {
-  config.all = {}
-}
 
 const main = async () => {
-  if (
-    !config.has('time') ||
-    !config.has('token') ||
-    !config.has('repository') ||
-    !config.has('period')
-  ) {
-    const validate = (input) => input !== ''
-    const questions = [
-      {
-        name: 'token',
-        message: 'Put your token here'
-      },
-      {
-        name: 'repository',
-        message: 'What repository we should watch? <user/repo>'
-      },
-      {
-        name: 'time',
-        message: 'What the amount of time?'
-      },
-      {
-        name: 'period',
-        message: 'What the unit of time? Valid values are: months, days, years',
-        choices: ['years', 'months', 'days', 'year', 'month', 'day']
-      }
-    ]
+  mongoose.connect('localhost', mongooseOptions);
 
-    const answers = await inquirer.prompt(questions.map(q => Object.assign(q, { validate })))
-    Object.keys(answers).forEach(k => {
-      config.set(k, answers[k])
-    })
-  }
+  const config = await getConfig()
 
   const github = new GitHub({
     token: config.get('token')
@@ -52,27 +26,72 @@ const main = async () => {
 
   const issues = github.getIssues(config.get('repository'))
   const list = await issues.listIssues()
-  const toUpdate = []
-  
-  for (i in list.data) {
-    if (list.data[i] == undefined) {
-      return
-    }
 
-    let lastUpdated = list.data[i].updated_at
-    let timePassed = moment(lastUpdated).fromNow(true).split(' ')
-
-    if (timePassed[0] > config.get('time') && timePassed[1] === config.get('period')) {
-      toUpdate.push(issues.createIssueComment(list.data[i].number, 'Issue fechada pelo bot. Motivo: Sem interações em um periodo de 3 meses.'))
-      toUpdate.push(issues.editIssue(list.data[i].number, {'state': 'closed'}))
-    }
+  if (!list || !list.data || !list.data.length) {
+    return
   }
+
+  const toUpdate = list.data
+    .filter(item => {
+      if (!item) {
+        return false
+      }
+
+      const updatedAt = moment(item.updated_at).fromNow(true).split(' ')
+
+      if (updatedAt[0] < config.get('time') || updatedAt[1] !== config.get('period')) {
+        return false
+      }
+
+      return true
+    })
+    .map(async ({ number, ...item }) => {
+      const issue = await Issue.findOne({ number }).exec()
+
+      if (!issue) {
+        const comment = `Olá ${item.user.login}, essa vaga ainda está aberta?`
+        const issueComment = await issues.createIssueComment(number, comment)
+        await Issue.create({ number, comment: issueComment.id })
+        return
+      }
+
+      const comments = (await issues.listIssueComment(number))
+        .filter(comment => comment.id >= issue.comment)
+
+      const lastComment = comments[comments.length - 1]
+
+      if (!lastComment) {
+        return
+      }
+
+      let shouldCloseIssue = false
+
+      if (
+        lastComment.id === issue.comment ||
+        moment(lastComment.updated_at) > moment(lastComment.updated_at).add(7, 'days')
+      ) {
+        shouldCloseIssue = true
+      }
+
+      if (lastComment.body.match(/não|nao|no|nope/g).length > 0) {
+        shouldCloseIssue = true
+      }
+
+      if (!shouldCloseIssue) {
+        return
+      }
+
+      issues.createIssueComment(number, 'Issue fechada pelo bot. Motivo: Sem interações.')
+      issues.editIssue(number, {state: 'closed'})
+      await Issue.findOneAndUpdate({ number }, { $set: { deletedAt: new Date() } })
+    })
 
   if (toUpdate.length > 0) {
     await Promise.all(toUpdate)
   }
 
-  console.log(`${toUpdate.length / 2} issues were closed!`)
+  await (new Promise((resolve, reject) => mongoose.disconnect(err => err ? reject(err) : resolve())))
+  console.log(`${toUpdate.length} issues were changed!`)
 }
 
 main()
