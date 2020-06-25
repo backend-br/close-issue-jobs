@@ -12,6 +12,10 @@ if (argv._[0] && argv._[0] === 'reset') {
   config.all = {}
 }
 
+const timeout = (ms) => {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 const main = async () => {
   if (
     !config.has('time') ||
@@ -51,10 +55,14 @@ const main = async () => {
   })
 
   const issues = github.getIssues(config.get('repository'))
-  const list = await issues.listIssues()
+  const list = await issues.listIssues({sort: 'created', state: 'open'})
   const toUpdate = []
-  
-  for (i in list.data) {
+
+  for (i = 0; i <= list.data.length; i++) {
+    await timeout(1000)
+
+    console.log('title: ' + list.data[i].title)
+
     if (list.data[i] == undefined) {
       return
     }
